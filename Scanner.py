@@ -65,7 +65,7 @@ os.makedirs(OUT_DIR, exist_ok=True)
 # Таймзона
 EEST_TZ = pytz.timezone("Europe/Tallinn")
 TZ = pytz.timezone("Europe/Moscow")
-DEFAULT_SUMMARY_TIME = "19:00"
+DEFAULT_SUMMARY_TIME = "00:00"
 # Время подготовки к summary
 SUMMARY_PREP_MINUTES = 0.5
 # SSL
