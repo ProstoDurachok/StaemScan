@@ -487,11 +487,6 @@ def get_valid_items(items: dict) -> List[Dict[str, Any]]:
             valid.append(it)
     logger.info(f"Validated {len(valid)} items out of {len(items)}")
     return valid
-def is_knife(item: dict) -> bool:
-    """Проверяет, является ли предмет ножом."""
-    category_dict = item.get('category', {})
-    cat_name = category_dict.get('name', '').lower() if isinstance(category_dict, dict) else str(item.get('category', '')).lower()
-    return any(kw in cat_name for kw in ['нож', 'knife'])
 def build_market_hash_name(item: dict) -> str:
     if item.get("market_hash_name"):
         return item["market_hash_name"]
@@ -1540,11 +1535,6 @@ def main():
         disable_proxy()
     items_raw = load_items()
     valid_items = get_valid_items(items_raw)
-    # ИЗМЕНЕНО: Фильтр только по ножам (временно)
-    ONLY_KNIVES = True
-    if ONLY_KNIVES:
-        valid_items = [item for item in valid_items if is_knife(item)]
-        log_event("knife_filter", f"Filtered to {len(valid_items)} knife items only")
     total_items = len(valid_items)
     log_event("items_loaded", f"Loaded {total_items} items")
     if total_items == 0:
