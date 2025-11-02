@@ -447,6 +447,8 @@ def request_with_retries(url: str, params=None, headers=None, timeout=15, allow_
     return None
 # ===================== ЗАГРУЗКА ПРЕДМЕТОВ =====================
 def load_items(force_update: bool = False) -> Dict[str, Any]:
+    items = {}  # Инициализируем пустым
+
     if os.path.exists(LOCAL_DB) and not force_update:
         try:
             with open(LOCAL_DB, "r", encoding="utf-8") as f:
@@ -459,7 +461,9 @@ def load_items(force_update: bool = False) -> Dict[str, Any]:
         except Exception as e:
             logger.error(f"Error loading local DB: {e}")
             force_update = True
-    if force_update:
+
+    # ИСПРАВЛЕНИЕ: Если файла нет или force_update=True — скачиваем
+    if not os.path.exists(LOCAL_DB) or force_update:
         log_event("fetch_attempt", "Attempting to fetch items from API")
         r = request_with_retries(BYMYKEL_URL, timeout=60)
         if r and r.status_code == 200:
@@ -476,8 +480,11 @@ def load_items(force_update: bool = False) -> Dict[str, Any]:
             log_event("fetch_failed", f"Failed to fetch items (status: {r.status_code if r else 'None'}). Using empty dict.")
     else:
         log_event("no_local", "No local DB found. Using empty dict.")
+
     log_event("empty_fallback", "Returning empty items dict")
-    return {}
+    return items  # Возвращаем items (может быть пустым)
+
+
 def get_valid_items(items: dict) -> List[Dict[str, Any]]:
     valid = []
     for it in items.values():
