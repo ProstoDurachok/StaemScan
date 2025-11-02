@@ -34,8 +34,8 @@ BYMYKEL_URL = "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/ap
 LOCAL_DB = "items.json"
 APPID = 730
 # Telegram
-TOKEN = os.environ.get("TELEGRAM_TOKEN", "7524644623:AAE6YasVXvYnnNH-xrbSH_odIHEqD_b15oo")
-CHAT_ID = os.environ.get("CHAT_ID", "-1002695033602")
+TOKEN = os.environ.get("TELEGRAM_TOKEN", "8427688497:AAGkBisiTfJM3RDc8DOG9Kx9l9EnekoFGQk")
+CHAT_ID = os.environ.get("CHAT_ID", "-1003143360650")
 MONITOR_BOT_CHAT_ID = os.environ.get("MONITOR_BOT_CHAT_ID", "873939087") # ID приватного чата с монитор-ботом (опционально)
 # Steam sessionid
 SESSIONID = os.environ.get("STEAM_SESSIONID", None)
