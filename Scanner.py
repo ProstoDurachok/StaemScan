@@ -44,18 +44,18 @@ USE_PROXY_BY_DEFAULT = False # Изменено на False для обхода �
 PROXY_HTTP_URL = "http://mm4pkP:a6K4yx@95.181.155.167:8000"
 PROXY_HTTP_ALT = "http://lte6:LVxqnyQiMH@65.109.79.15:13014"
 # Поведение запросов (увеличено для снижения 429)
-REQUEST_DELAY = 5.5 # Увеличено до 7s для снижения 429
-JITTER = 3.0
-MAX_RETRIES = 2
-MAX_RETRIES_429 = 3
+REQUEST_DELAY = 1.5 # Увеличено до 7s для снижения 429
+JITTER = 2.0
+MAX_RETRIES = 1
+MAX_RETRIES_429 = 1
 BACKOFF_BASE = 2.0
-RATE_LIMIT_PAUSE = 30
+RATE_LIMIT_PAUSE = 20
 RATE_LIMIT_COUNT = 0
 # Фильтры
 VOLATILITY_THRESHOLD = 6.0
-PRICE_CHANGE_THRESHOLD = 8.0
-BREAKOUT_THRESHOLD = 1.5
-MIN_PRICE = 1.5
+PRICE_CHANGE_THRESHOLD = 7.0
+BREAKOUT_THRESHOLD = 1.25
+MIN_PRICE = 1.25
 MIN_VOLUME_24H = 1
 HISTORY_DAYS = 7
 USD_RATE = 83.4
