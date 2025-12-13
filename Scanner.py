@@ -44,10 +44,10 @@ USE_PROXY_BY_DEFAULT = False # Изменено на False для обхода �
 PROXY_HTTP_URL = "http://mm4pkP:a6K4yx@95.181.155.167:8000"
 PROXY_HTTP_ALT = "http://lte6:LVxqnyQiMH@65.109.79.15:13014"
 # Поведение запросов (увеличено для снижения 429)
-REQUEST_DELAY = 1.5 # Увеличено до 7s для снижения 429
-JITTER = 2.0
-MAX_RETRIES = 1
-MAX_RETRIES_429 = 1
+REQUEST_DELAY = 8.5 # Увеличено до 7s для снижения 429
+JITTER = 5.0
+MAX_RETRIES = 2
+MAX_RETRIES_429 = 2
 BACKOFF_BASE = 2.0
 RATE_LIMIT_PAUSE = 20
 RATE_LIMIT_COUNT = 0
