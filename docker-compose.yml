@@ -1,7 +1,7 @@
 services:
   mybot:
     build: .
-    container_name: mybot3
+    container_name: mybot4
     restart: always
     working_dir: /app
     volumes:
