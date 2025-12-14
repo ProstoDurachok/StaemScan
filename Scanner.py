@@ -44,18 +44,18 @@ USE_PROXY_BY_DEFAULT = False # Изменено на False для обхода �
 PROXY_HTTP_URL = "http://mm4pkP:a6K4yx@95.181.155.167:8000"
 PROXY_HTTP_ALT = "http://lte6:LVxqnyQiMH@65.109.79.15:13014"
 # Поведение запросов (увеличено для снижения 429)
-REQUEST_DELAY = 8.5 # Увеличено до 7s для снижения 429
-JITTER = 5.0
+REQUEST_DELAY = 6.0 # Увеличено до 7s для снижения 429
+JITTER = 3.0
 MAX_RETRIES = 2
-MAX_RETRIES_429 = 2
+MAX_RETRIES_429 = 3
 BACKOFF_BASE = 2.0
-RATE_LIMIT_PAUSE = 20
+RATE_LIMIT_PAUSE = 30
 RATE_LIMIT_COUNT = 0
 # Фильтры
-VOLATILITY_THRESHOLD = 6.0
-PRICE_CHANGE_THRESHOLD = 7.0
-BREAKOUT_THRESHOLD = 1.25
-MIN_PRICE = 1.25
+VOLATILITY_THRESHOLD = 8.0
+PRICE_CHANGE_THRESHOLD = 10.0
+BREAKOUT_THRESHOLD = 2.0
+MIN_PRICE = 2.0
 MIN_VOLUME_24H = 1
 HISTORY_DAYS = 7
 USD_RATE = 83.4
@@ -552,11 +552,13 @@ def quick_parse_history(raw_history, usd_rate):
             "price_growth": 0.0,
             "volume_growth": 0.0
         }
+ 
     now = datetime.now(tz=TZ)
     last_24h_start = now - timedelta(hours=24)
     prev_24h_start = now - timedelta(hours=48)
     prev_24h_end = last_24h_start
     cutoff_date = now - timedelta(days=HISTORY_DAYS)
+ 
     rows = []
     for p in raw_history: # Убрал reversed — парсим в исходном порядке (Steam: newest first)
         try:
@@ -575,6 +577,7 @@ def quick_parse_history(raw_history, usd_rate):
             rows.append({"timestamp": dt, "price_usd": price, "volume": volume})
         except Exception:
             continue
+ 
     if not rows:
         return {
             "current_price_usd": 0.0,
@@ -583,10 +586,13 @@ def quick_parse_history(raw_history, usd_rate):
             "price_growth": 0.0,
             "volume_growth": 0.0
         }
+ 
     df = pd.DataFrame(rows).sort_values("timestamp").reset_index(drop=True) # Сортируем по времени (oldest first)
+ 
     # Current price: последняя цена в last_24h (или общая последняя, если нет)
     last_24h_df = df[df["timestamp"] >= last_24h_start]
     current_price_usd = last_24h_df["price_usd"].iloc[-1] if not last_24h_df.empty else df["price_usd"].iloc[-1]
+ 
     # Prev price: цена closest to exactly 24h ago
     exact_24h_ago = now - timedelta(hours=24)
     # Filter to prev period for safety
@@ -596,12 +602,15 @@ def quick_parse_history(raw_history, usd_rate):
         prev_price = prev_candidates.loc[closest_idx, "price_usd"]
     else:
         prev_price = 0.0
+ 
     # Volumes
     volume_24h = last_24h_df["volume"].sum() if not last_24h_df.empty else 0
     prev_volume = prev_candidates["volume"].sum() if not prev_candidates.empty else 0
+ 
     # Growth
     price_growth = ((current_price_usd - prev_price) / prev_price * 100) if prev_price > 0 else 0.0
     volume_growth = ((volume_24h - prev_volume) / prev_volume * 100) if prev_volume > 0 else (100.0 if volume_24h > 0 else -100.0)
+ 
     return {
         "current_price_usd": current_price_usd,
         "volume_24h": volume_24h,
@@ -794,6 +803,7 @@ def fetch_item_image(image_url: str, mhn: str, max_retries: int = 5) -> tuple[By
                 logger.warning(f"Image fetch failed {r_img.status_code} (attempt {attempt+1}) for {mhn}: {image_url}")
         except Exception as e:
             logger.warning(f"Image fetch error (attempt {attempt+1}): {e} for {mhn}")
+  
         if attempt < max_retries - 1:
             time.sleep(2 + random.uniform(0, 3))
     # Если все ретраи fail — placeholder
@@ -806,6 +816,7 @@ def create_placeholder_image(mhn: str) -> BytesIO:
         buf = BytesIO()
         img = Image.new('RGB', (360, 360), color='#1b2838') # Steam-размер
         draw = ImageDraw.Draw(img)
+  
         # Текст скина
         try:
             font = ImageFont.truetype("arial.ttf", 20) # Или любой шрифт
@@ -814,12 +825,14 @@ def create_placeholder_image(mhn: str) -> BytesIO:
         text = mhn[:30] + "..." if len(mhn) > 30 else mhn # Обрезаем
         draw.text((10, 150), text, fill='#ccc', font=font)
         draw.text((10, 180), "No image available", fill='#888', font=font)
+  
         # Логотип (маленький)
         if os.path.exists(LOGO_PATH):
             logo = Image.open(LOGO_PATH).convert("RGBA")
             logo_size = 60
             logo.thumbnail((logo_size, logo_size), Image.Resampling.LANCZOS)
             img.paste(logo, (250, 10), logo) # Top-right
+  
         img.save(buf, format='PNG')
         buf.seek(0)
         logger.info(f"Placeholder created for {mhn}")
@@ -1010,7 +1023,7 @@ def get_item_type_and_hashtags(market_hash_name: str, item: dict) -> tuple[str, 
             # Первая часть обычно "Наклейка" — пропускаем
             team_player_part = parts[1] # "TeSeS (с блёстками)"
             tournament_part = parts[2] # "Шанхай-2024"
-     
+        
             # Очистка и хэштегизация для команды/игрока
             team_player_tag = clean_tag(team_player_part)
             # Проверяем маппинг для команды, если возможно
@@ -1024,7 +1037,7 @@ def get_item_type_and_hashtags(market_hash_name: str, item: dict) -> tuple[str, 
                 team_player_tag = mapped_team
             if team_player_tag:
                 hashtags += f" #{team_player_tag}"
-     
+        
             # Очистка и хэштегизация для турнира
             tour_tag = clean_tag(tournament_part)
             # Проверяем маппинг для турнира
@@ -1055,7 +1068,7 @@ def get_item_type_and_hashtags(market_hash_name: str, item: dict) -> tuple[str, 
                     team_tag = clean_tag(team_name_lower)
                 if team_tag:
                     hashtags += f" #{team_tag}"
-   
+      
             tournament = item.get('tournament', {})
             if tournament:
                 name_lower = tournament.get('name', '').lower()
@@ -1068,6 +1081,7 @@ def get_item_type_and_hashtags(market_hash_name: str, item: dict) -> tuple[str, 
                     tour_tag = clean_tag(name_lower)
                 if tour_tag:
                     hashtags += f" #{tour_tag}"
+  
         return "sticker", hashtags
     other_types = {
         "container": "#контейнер",
@@ -1141,19 +1155,25 @@ def overlay_logo_on_image(buf: BytesIO, position: str = "top_right", opacity: fl
             img.convert("RGB").save(new_buf, format='PNG')
             new_buf.seek(0)
             return new_buf
+  
         logo = Image.open(LOGO_PATH).convert("RGBA")
+  
         logo_size = int(img.width * 0.1)
         logo.thumbnail((logo_size, logo_size), Image.Resampling.LANCZOS)
+  
         alpha = logo.split()[-1]
         alpha = ImageEnhance.Brightness(alpha).enhance(opacity)
         logo.putalpha(alpha)
+  
         if is_graph:
             pos_x = (img.width - logo.width) // 2
             pos_y = (img.height - logo.height) // 2
         else:
             pos_x = img.width - logo.width - 10
             pos_y = 10
+  
         img.paste(logo, (pos_x, pos_y), logo)
+  
         new_buf = BytesIO()
         img.convert("RGB").save(new_buf, format='PNG')
         new_buf.seek(0)
@@ -1234,17 +1254,17 @@ def build_plots(item: dict, days: int = HISTORY_DAYS) -> tuple[BytesIO, BytesIO,
             fig_order.patch.set_facecolor('#1b2838')
             ax_order.set_facecolor('#1b2838')
             ax_order.set_title(f"Книга ордеров — {item['name']}", fontsize=10, color='#fff', pad=10)
-   
+      
             buy_graph = histogram["buy_order_graph"]
             buy_prices = [row[0] for row in buy_graph]
             buy_cumuls = [row[1] for row in buy_graph]
             ax_order.step(buy_prices, buy_cumuls, where='post', color='#00FF00', linewidth=1.5, label='Запросов на покупку (Зелёный)')
-   
+      
             sell_graph = histogram["sell_order_graph"]
             sell_prices = [row[0] for row in sell_graph]
             sell_cumuls = [row[1] for row in sell_graph]
             ax_order.step(sell_prices, sell_cumuls, where='post', color='#FF0000', linewidth=1.5, label='Лотов на продажу (Красный)')
-   
+      
             ax_order.set_ylabel("Количество", fontsize=8, color='#ccc')
             ax_order.set_xlabel("Цена (₽)", fontsize=8, color='#ccc')
             ax_order.grid(True, linestyle="--", alpha=0.2, color='#555')
@@ -1534,9 +1554,11 @@ def main():
         if target_time <= now_local:
             target_time += timedelta(days=1)
         time_to_target = (target_time - now_local).total_seconds()
+  
         minutes_to_target = time_to_target / 60
         print(f"[INFO] Time until top items summary post: {minutes_to_target:.1f} minutes ({time_to_target:.0f} seconds)")
         log_event("time_to_summary", f"Remaining time to top items post: {minutes_to_target:.1f} min")
+  
         summary_sent_in_24h = False
         if last_summary_sent:
             time_diff = (now_local - last_summary_sent).total_seconds()
@@ -1551,6 +1573,7 @@ def main():
                     log_event("summary_skipped_24h", "Summary skipped due to 24h limit")
             except Exception as e:
                 logger.warning(f"Error checking summary 24h: {e}")
+  
         prep_time_to_target = time_to_target - (SUMMARY_PREP_MINUTES * 60)
         is_prep_mode = (prep_time_to_target <= 0 and time_to_target > 0)
         if is_prep_mode:
@@ -1566,14 +1589,15 @@ def main():
                     target_time += timedelta(days=1)
                 time_to_target = (target_time - now_local).total_seconds()
             is_prep_mode = False
+  
         if time_to_target <= 0 and not summary_sent_in_24h:
             print("[INFO] Time reached! Generating and sending top items summary")
             log_event("summary_time_reached", "Exact time for top items summary reached")
             posted_items = load_posted_items(for_summary=True)
             combined_caption, combined_media = generate_daily_summary(posted_items, posted_log)
-   
+      
             sent, sent_id = send_summary_parts(combined_caption, combined_media)
-   
+      
             if sent:
                 print("[INFO] Full cleanup after top items summary sent")
                 log_event("summary_sent_success", "Top items summary sent successfully")
@@ -1616,7 +1640,7 @@ def main():
                 target_time += timedelta(days=1)
             time_to_target = (target_time - now_local).total_seconds()
             print(f"[DEBUG] time_to_target inside loop: {time_to_target:.0f}s") # Remove in prod
-   
+      
             if time_to_target <= 60 and not summary_sent_in_24h:
                 print("[INFO] Summary time hit during scan! Interrupting for summary.")
                 log_event("summary_interrupt", "Summary time during scan, interrupting")
@@ -1651,7 +1675,7 @@ def main():
                     print("[INFO] Cleanup done after interrupt")
                     log_event("cleanup_after_interrupt", "Cleanup after summary interrupt")
                 break
-   
+      
             # Prep mode check inside loop
             prep_time_to_target = time_to_target - (SUMMARY_PREP_MINUTES * 60)
             if prep_time_to_target <= 0 and time_to_target > 0:
@@ -1661,11 +1685,11 @@ def main():
                 log_event("prep_sleep", f"Sleeping {time_to_target/60:.1f} min until summary")
                 time.sleep(time_to_target)
                 break
-   
+      
             if is_prep_mode:
                 log_event("prep_interrupt", "Interrupting analysis for top items summary prep")
                 break
-   
+      
             try:
                 item_counter += 1
                 if item_counter % PROGRESS_INTERVAL == 0:
@@ -1713,23 +1737,14 @@ def main():
                 item["history_raw"] = raw_history
                 item["histogram"] = data.get("histogram")
                 item["usd_rate"] = USD_RATE
-                # === НОВАЯ ЛОГИКА ПОЛУЧЕНИЯ ИЗОБРАЖЕНИЯ ===
-                # 1. Приоритет №1: прямая ссылка из локального JSON (item["image"]) — она всегда правильная и высокого качества
-                primary_image_url = item.get("image", "").strip()
-                if primary_image_url:
-                    if primary_image_url.startswith("http"):
-                        item["image_url"] = primary_image_url
+                # Handle image_url fallback here (как в старом коде)
+                fallback_image = item.get('image', '')
+                item["image_url"] = data["image_url"] or ""
+                if not item["image_url"] and fallback_image:
+                    if fallback_image.startswith('http'):
+                        item["image_url"] = fallback_image
                     else:
-                        # Если это относительный путь (как в вашем JSON), добавляем базовый URL Steam
-                        item["image_url"] = f"https://community.akamai.steamstatic.com/economy/image/{primary_image_url}"
-                    logger.info(f"Using primary image from JSON for {mhn}: {item['image_url']}")
-                else:
-                    # 2. Fallback: изображение, спаршенное со страницы Steam
-                    item["image_url"] = data.get("image_url", "") or ""
-                    if not item["image_url"]:
-                        logger.warning(f"No image URL from page for {mhn}, will try placeholder later")
-                
-                # === КОНЕЦ НОВОЙ ЛОГИКИ ===
+                        item["image_url"] = f"https://community.cloud.steamstatic.com/economy/image/{fallback_image}/360fx360f"
                 item["name"] = item.get("name", mhn)
                 item["publications"] = 1
                 item["sell_listings"] = data["sell_listings"]
@@ -1758,12 +1773,12 @@ def main():
                     growth_sign = "+" if item["growth"] >= 0 else ""
                     volume_sign = "+" if item["volume_change"] >= 0 else ""
                     color_emoji = "🟢" if item["growth"] >= 0 else "🔴"
-           
+              
                     _, hashtags = get_item_type_and_hashtags(mhn, item)
-           
+              
                     similar_posts = get_similar_posts(mhn)
                     similar_text = " | ".join(similar_posts) if similar_posts else "Нет"
-           
+              
                     caption = (
                         f"<a href=\"{steam_url}\">{html.escape(item['name'])}</a>\n\n"
                         f"{color_emoji} Стоимость: {format_rub(item['price_rub'])} ({format_usd(item['price_usd'])}) (24 часа: {growth_sign}{item['growth']:.2f}%)\n"
@@ -1787,7 +1802,7 @@ def main():
                     media_files.append(('photo', volume_buf.getvalue()))
                     media_files.append(('photo', order_buf.getvalue()))
                     sent_id = send_media_group_telegram(media_files, caption)
-           
+              
                     if sent_id:
                         posted_log.append(mhn)
                         save_posted_log(posted_log)
