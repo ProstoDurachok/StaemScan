@@ -40,12 +40,12 @@ MONITOR_BOT_CHAT_ID = os.environ.get("MONITOR_BOT_CHAT_ID", "873939087") # ID п
 # Steam sessionid
 SESSIONID = os.environ.get("STEAM_SESSIONID", None)
 # Прокси
-USE_PROXY_BY_DEFAULT = True # Изменено на False для обхода таймаута
+USE_PROXY_BY_DEFAULT = False # Изменено на False для обхода таймаута
 PROXY_HTTP_URL = "http://lYTik3vR:kLJm6Vvc@45.87.252.33:3000"
 PROXY_HTTP_ALT = "http://lYTik3vR:kLJm6Vvc@45.142.253.51:3000"
 # Поведение запросов (увеличено для снижения 429)
-REQUEST_DELAY = 10 # Увеличено до 7s для снижения 429
-JITTER = 5.0
+REQUEST_DELAY = 15 # Увеличено до 7s для снижения 429
+JITTER = 8.0
 MAX_RETRIES = 2
 MAX_RETRIES_429 = 3
 BACKOFF_BASE = 2.0
