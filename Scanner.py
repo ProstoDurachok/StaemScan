@@ -29,28 +29,34 @@ import psutil # Для мониторинга нагрузки
 import logging # Для логирования
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance # Для наложения лого
 import base64 # Для кодирования лого если нужно
+
 # ===================== НАСТРОЙКИ =====================
 BYMYKEL_URL = "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/ru/all.json"
 LOCAL_DB = "items.json"
 APPID = 730
+
 # Telegram
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "8427688497:AAGkBisiTfJM3RDc8DOG9Kx9l9EnekoFGQk")
-CHAT_ID = os.environ.get("CHAT_ID", "-1003143360650")
+CHAT_ID = os.environ.get("CHAT_ID", "-1003215068555")
 MONITOR_BOT_CHAT_ID = os.environ.get("MONITOR_BOT_CHAT_ID", "873939087") # ID приватного чата с монитор-ботом (опционально)
+
 # Steam sessionid
 SESSIONID = os.environ.get("STEAM_SESSIONID", None)
+
 # Прокси
 USE_PROXY_BY_DEFAULT = False # Изменено на False для обхода таймаута
 PROXY_HTTP_URL = "http://lYTik3vR:kLJm6Vvc@45.87.252.33:3000"
 PROXY_HTTP_ALT = "http://lYTik3vR:kLJm6Vvc@45.142.253.51:3000"
+
 # Поведение запросов (увеличено для снижения 429)
-REQUEST_DELAY = 25 # Увеличено до 7s для снижения 429
+REQUEST_DELAY = 15 # Увеличено до 15s для снижения 429
 JITTER = 10.0
 MAX_RETRIES = 2
 MAX_RETRIES_429 = 3
 BACKOFF_BASE = 2.0
 RATE_LIMIT_PAUSE = 30
 RATE_LIMIT_COUNT = 0
+
 # Фильтры
 VOLATILITY_THRESHOLD = 8.0
 PRICE_CHANGE_THRESHOLD = 8.0
@@ -59,38 +65,49 @@ MIN_PRICE = 1.25
 MIN_VOLUME_24H = 1
 HISTORY_DAYS = 7
 USD_RATE = 83.4
+
 # Папка для CSV/PNG
 OUT_DIR = "out"
 os.makedirs(OUT_DIR, exist_ok=True)
+
 # Таймзона
 EEST_TZ = pytz.timezone("Europe/Tallinn")
 TZ = pytz.timezone("Europe/Moscow")
 DEFAULT_SUMMARY_TIME = "00:00"
+
 # Время подготовки к summary
 SUMMARY_PREP_MINUTES = 0.5
+
 # SSL
 ALLOW_INSECURE = False
+
 # Лог
 LOG_FILE = "posted_items.json"
 SUMMARY_LOG = "summary_log.json"
 POSTED_HISTORY_FILE = "posted_history.json"
 POSTED_ITEMS_FILE = "posted_items_data.json"
+
 # Кэш
 CACHE_FILE = "item_cache.json"
 CACHE_TTL = 1800
+
 # Кэш изображений
 IMAGE_CACHE_FILE = "image_cache.json"
 IMAGE_CACHE_TTL = 3600
+
 # Мониторинг
 MONITOR_INTERVAL = 50
 PROGRESS_INTERVAL = 10
+
 # Логирование
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 BOT_LOG_FILE = os.path.join(LOG_DIR, "bot_events.log")
+
 # Лого
 LOGO_PATH = "VS1.png"
 LOGO_OPACITY = 0.7 # ИЗМЕНЕНО: Уменьшено для summary (было 1.0), чтобы водяной знак был заметнее, но не доминировал
+
 CATEGORY_KEYWORDS = {
     'pistol': ['пистолет', 'pistol'],
     'rifle': ['винтовк', 'shurmov', 'снайперск', 'rifle'],
@@ -102,6 +119,7 @@ CATEGORY_KEYWORDS = {
     'heavy': ['тяжелое', 'heavy'],
     'sniper': ['снайперская винтовка', 'sniper rifle']
 }
+
 CATEGORY_HASHTAGS = {
     'pistol': '#пистолет',
     'rifle': '#винтовка',
@@ -114,6 +132,7 @@ CATEGORY_HASHTAGS = {
     'sniper': '#снайперскаявинтовка',
     'other': '#другое'
 }
+
 # Карты для тегов команд и турниров (улучшено для стикеров)
 TEAM_MAP = {
     'faze clan': 'fazeclan',
@@ -135,6 +154,7 @@ TEAM_MAP = {
     'the mongolz': 'mongolz',
     'mongolz': 'mongolz'
 }
+
 TOURNAMENT_MAP = {
     'berlin': 'берлин2019',
     'stockholm': 'стокгольм2021',
@@ -148,8 +168,10 @@ TOURNAMENT_MAP = {
     'iem': 'iem',
     'major': 'мейджор'
 }
+
 # Заглушка
 MAINTENANCE_MESSAGE = "⚠️ Я временно недоступен, ведутся технические работы!\nНе теряйте меня! Подписывайтесь на наши новости: @valvestreet_media"
+
 # ===================== НАСТРОЙКА ЛОГИРОВАНИЯ =====================
 logging.basicConfig(
     level=logging.INFO,
@@ -160,11 +182,13 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
 def log_event(stage: str, description: str, item_name: str = None):
     msg = f"Stage: {stage} | Description: {description}"
     if item_name:
         msg += f" | Item: {item_name}"
     logger.info(msg)
+
 # ===================== ФУНКЦИЯ ПОЛУЧЕНИЯ КУРСА USD/RUB =====================
 def get_usd_to_rub_rate():
     url = "https://www.cbr-xml-daily.ru/daily_json.js"
@@ -177,6 +201,7 @@ def get_usd_to_rub_rate():
     except Exception as e:
         logger.warning(f"Failed to fetch USD rate: {e}, using default {USD_RATE}")
         return USD_RATE
+
 # ===================== КЭШ =====================
 def load_cache() -> Dict[str, Dict]:
     if os.path.exists(CACHE_FILE):
@@ -193,16 +218,19 @@ def load_cache() -> Dict[str, Dict]:
             logger.error(f"Error loading cache: {e}")
             pass
     return {}
+
 def save_cache(cache: Dict[str, Dict]):
     try:
         with open(CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Error saving cache: {e}")
+
 def clear_cache(): # ИЗМЕНЕНО: Новая функция для полной очистки кэша после summary
     if os.path.exists(CACHE_FILE):
         os.remove(CACHE_FILE)
         logger.info("Cache cleared after summary")
+
 # Кэш изображений
 def load_image_cache() -> Dict[str, Dict]:
     if os.path.exists(IMAGE_CACHE_FILE):
@@ -219,16 +247,19 @@ def load_image_cache() -> Dict[str, Dict]:
             logger.error(f"Error loading image cache: {e}")
             pass
     return {}
+
 def save_image_cache(cache: Dict[str, Dict]):
     try:
         with open(IMAGE_CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Error saving image cache: {e}")
+
 def clear_image_cache():
     if os.path.exists(IMAGE_CACHE_FILE):
         os.remove(IMAGE_CACHE_FILE)
         logger.info("Image cache cleared after summary")
+
 # ===================== ФУНКЦИЯ МОНИТОРИНГА НАГРУЗКИ =====================
 def print_resource_usage(item_count: int, total_items: int):
     try:
@@ -237,9 +268,11 @@ def print_resource_usage(item_count: int, total_items: int):
         print(f"[MONITOR] After {item_count}/{total_items} items: CPU {cpu_percent:.1f}%, Memory {memory_percent:.1f}%")
     except Exception as e:
         logger.warning(f"Resource monitoring failed: {e}")
+
 def print_progress(item_count: int, total_items: int):
     print(f"[PROGRESS] Processed {item_count}/{total_items} items ({item_count/total_items*100:.1f}%)")
     log_event("progress_update", f"Processed {item_count}/{total_items} items ({item_count/total_items*100:.1f}%)")
+
 # ===================== Сессия requests =====================
 session = requests.Session()
 session.headers.update({
@@ -250,21 +283,26 @@ session.headers.update({
 })
 session.trust_env = False
 session.verify = True
+
 if SESSIONID:
     session.cookies.set("sessionid", SESSIONID)
+
 def enable_proxy(proxy_url: str):
     global RATE_LIMIT_COUNT
     RATE_LIMIT_COUNT = 0
     session.proxies.update({"http": proxy_url, "https": proxy_url})
+
 def disable_proxy():
     global RATE_LIMIT_COUNT
     RATE_LIMIT_COUNT = 0
     session.proxies.clear()
+
 USE_PROXY = USE_PROXY_BY_DEFAULT
 if USE_PROXY:
     enable_proxy(PROXY_HTTP_URL)
 else:
     disable_proxy()
+
 # ===================== УТИЛИТЫ =====================
 def safe_json_loads(s: str) -> Optional[Any]:
     try:
@@ -274,6 +312,7 @@ def safe_json_loads(s: str) -> Optional[Any]:
         return json.loads(s2)
     except Exception:
         return None
+
 def parse_date(value) -> Optional[datetime]:
     if value is None:
         return None
@@ -309,6 +348,7 @@ def parse_date(value) -> Optional[datetime]:
             except:
                 pass
     return None
+
 # ===================== ЛОГ ПОСЛЕДНЕЙ СВОДКИ =====================
 def load_last_summary() -> Optional[datetime]:
     if os.path.exists(SUMMARY_LOG):
@@ -320,12 +360,14 @@ def load_last_summary() -> Optional[datetime]:
             logger.warning(f"Error loading last summary: {e}")
             pass
     return None
+
 def save_last_summary(dt: datetime):
     try:
         with open(SUMMARY_LOG, "w", encoding="utf-8") as f:
             json.dump({'last_sent': dt.isoformat()}, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Error saving last summary: {e}")
+
 # ===================== НОВЫЕ ФУНКЦИИ ДЛЯ POSTED ITEMS =====================
 def load_posted_items(for_summary: bool = False) -> List[Dict]:
     if os.path.exists(POSTED_ITEMS_FILE):
@@ -346,6 +388,7 @@ def load_posted_items(for_summary: bool = False) -> List[Dict]:
             logger.error(f"Error loading posted items: {e}")
             pass
     return []
+
 def save_posted_item(item: Dict):
     try:
         posted_items = load_posted_items(for_summary=False) # No log spam
@@ -358,6 +401,7 @@ def save_posted_item(item: Dict):
             json.dump(posted_items, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Error saving posted item: {e}")
+
 # ===================== УВЕДОМЛЕНИЕ МОНИТОР-БОТА =====================
 def notify_monitor_bot(event_type: str, details: str = ""):
     """Отправляет уведомление монитор-боту в приватный чат для симуляции 'поста в канале'."""
@@ -380,45 +424,80 @@ def notify_monitor_bot(event_type: str, details: str = ""):
             logger.warning(f"Notification to monitor bot failed: {r.text if r else 'No response'}")
     except Exception as e:
         logger.error(f"Error sending notification to monitor bot: {e}")
+
 # ===================== РЕКВЕСТЫ С RETRY / FALLBACK =====================
-def request_with_retries(url: str, params=None, headers=None, timeout=15, allow_429_backoff=True, force_direct=False):
+def request_with_retries(url: str, params=None, headers=None, timeout=15, allow_429_backoff=True, force_direct=False, use_proxy_on_429=True):
     global RATE_LIMIT_COUNT, USE_PROXY
-    if force_direct:
-        session.proxies.clear()
     attempt = 0
     consecutive_429 = 0
+    
     while attempt <= MAX_RETRIES:
         try:
+            # Если это запрос для получения предмета и у нас была 429, пробуем прокси
+            if use_proxy_on_429 and "steamcommunity.com/market" in url and consecutive_429 > 0:
+                if USE_PROXY:
+                    enable_proxy(PROXY_HTTP_URL)
+                else:
+                    enable_proxy(PROXY_HTTP_URL)
+                    USE_PROXY = True
+            
             r = session.get(url, params=params, headers=headers, timeout=timeout)
+            
             if r.status_code == 429 and allow_429_backoff:
                 consecutive_429 += 1
                 RATE_LIMIT_COUNT += 1
+                
+                # Если это запрос предмета с маркета и получили 429, пробуем прокси
+                if "steamcommunity.com/market/listings" in url and use_proxy_on_429:
+                    logger.warning(f"Got 429 for market item, switching to proxy (attempt {attempt})")
+                    if USE_PROXY:
+                        enable_proxy(PROXY_HTTP_ALT)
+                    else:
+                        enable_proxy(PROXY_HTTP_URL)
+                        USE_PROXY = True
+                    # Делаем паузу перед повторной попыткой
+                    time.sleep(RATE_LIMIT_PAUSE + random.random() * 10)
+                    continue
+                
+                # Обычный backoff для других запросов
                 attempt_429 = 0
                 while attempt_429 < MAX_RETRIES_429:
                     attempt_429 += 1
                     backoff = BACKOFF_BASE ** attempt_429 + random.random()
+                    logger.warning(f"Got 429, backing off {backoff:.1f}s (attempt {attempt_429})")
                     time.sleep(backoff)
+                    
+                    # После backoff пробуем с прокси если это запрос предмета
+                    if "steamcommunity.com/market/listings" in url and use_proxy_on_429:
+                        if USE_PROXY:
+                            enable_proxy(PROXY_HTTP_ALT)
+                        else:
+                            enable_proxy(PROXY_HTTP_URL)
+                            USE_PROXY = True
+                    
                     r = session.get(url, params=params, headers=headers, timeout=timeout)
                     if r.status_code != 429:
                         consecutive_429 = 0
                         break
+                
                 if consecutive_429 >= 3:
-                    time.sleep(RATE_LIMIT_PAUSE)
+                    logger.warning("Multiple consecutive 429s, long pause")
+                    time.sleep(RATE_LIMIT_PAUSE * 2)
                     consecutive_429 = 0
-                    if USE_PROXY:
+                    if USE_PROXY and use_proxy_on_429:
                         enable_proxy(PROXY_HTTP_ALT)
+                    elif use_proxy_on_429:
+                        enable_proxy(PROXY_HTTP_URL)
                         USE_PROXY = True
-                    else:
-                        disable_proxy()
+            
             return r
+            
         except (SSLError, ProxyError) as err:
             consecutive_429 = 0
+            logger.warning(f"SSL/Proxy error: {err}, trying without proxy")
             old_proxies = session.proxies.copy()
             try:
-                if "mm4pkP" in PROXY_HTTP_URL and USE_PROXY:
-                    enable_proxy(PROXY_HTTP_ALT)
-                else:
-                    disable_proxy()
+                disable_proxy()
                 r = session.get(url, params=params, headers=headers, timeout=timeout)
                 if r.status_code == 429 and allow_429_backoff:
                     attempt_429 = 0
@@ -438,13 +517,17 @@ def request_with_retries(url: str, params=None, headers=None, timeout=15, allow_
             backoff = BACKOFF_BASE ** attempt + random.random()
             time.sleep(backoff)
             continue
+            
         except RequestException as e:
             attempt += 1
             backoff = BACKOFF_BASE ** attempt + random.random()
+            logger.warning(f"Request error: {e}, retrying in {backoff:.1f}s")
             time.sleep(backoff)
             continue
+    
     logger.warning(f"Request to {url} failed after {MAX_RETRIES} retries")
     return None
+
 # ===================== ЗАГРУЗКА ПРЕДМЕТОВ =====================
 def load_items(force_update: bool = False) -> Dict[str, Any]:
     items = {} # Инициализируем пустым
@@ -460,6 +543,7 @@ def load_items(force_update: bool = False) -> Dict[str, Any]:
         except Exception as e:
             logger.error(f"Error loading local DB: {e}")
             force_update = True
+    
     # ИСПРАВЛЕНИЕ: Если файла нет или force_update=True — скачиваем
     if not os.path.exists(LOCAL_DB) or force_update:
         log_event("fetch_attempt", "Attempting to fetch items from API")
@@ -478,8 +562,10 @@ def load_items(force_update: bool = False) -> Dict[str, Any]:
             log_event("fetch_failed", f"Failed to fetch items (status: {r.status_code if r else 'None'}). Using empty dict.")
     else:
         log_event("no_local", "No local DB found. Using empty dict.")
+    
     log_event("empty_fallback", "Returning empty items dict")
     return items # Возвращаем items (может быть пустым)
+
 def get_valid_items(items: dict) -> List[Dict[str, Any]]:
     valid = []
     for it in items.values():
@@ -487,6 +573,7 @@ def get_valid_items(items: dict) -> List[Dict[str, Any]]:
             valid.append(it)
     logger.info(f"Validated {len(valid)} items out of {len(items)}")
     return valid
+
 def build_market_hash_name(item: dict) -> str:
     if item.get("market_hash_name"):
         return item["market_hash_name"]
@@ -501,6 +588,7 @@ def build_market_hash_name(item: dict) -> str:
     if item.get("souvenir"):
         name = f"Souvenir {name}"
     return name
+
 def parse_order_table(soup: BeautifulSoup, table_id: str) -> List[List[float]]:
     div = soup.find("div", {"id": table_id})
     if not div:
@@ -542,6 +630,7 @@ def parse_order_table(soup: BeautifulSoup, table_id: str) -> List[List[float]]:
         cumul += q
         graph.append([p, float(cumul)])
     return graph
+
 # ===================== ЛЁГКИЙ ПАРСИНГ ИСТОРИИ =====================
 def quick_parse_history(raw_history, usd_rate):
     if not raw_history:
@@ -618,16 +707,22 @@ def quick_parse_history(raw_history, usd_rate):
         "price_growth": price_growth,
         "volume_growth": volume_growth
     }
+
 # ===================== ПОЛУЧЕНИЕ ИСТОРИИ ЦЕН И ДРУГИХ ДАННЫХ =====================
 def get_item_data(market_hash_name: str) -> Dict[str, Any]:
     encoded = quote(market_hash_name, safe='')
     url = f"https://steamcommunity.com/market/listings/{APPID}/{encoded}"
     headers = {"Referer": url}
-    r = request_with_retries(url, headers=headers, timeout=20)
+    
+    # Используем прокси при получении 429 для запросов к маркету
+    r = request_with_retries(url, headers=headers, timeout=20, use_proxy_on_429=True)
+    
     if not r or r.status_code != 200:
-        logger.warning(f"Failed to fetch item data for {market_hash_name}")
+        logger.warning(f"Failed to fetch item data for {market_hash_name} (status: {r.status_code if r else 'None'})")
         return {"history": [], "sell_listings": 0, "buy_orders": 0, "total_listings": 0, "price_usd": 0.0, "image_url": "", "histogram": None}
+    
     soup = BeautifulSoup(r.text, "html.parser")
+    
     # Парсинг истории цен (unchanged)
     scripts = soup.find_all("script")
     candidate = None
@@ -648,6 +743,7 @@ def get_item_data(market_hash_name: str) -> Dict[str, Any]:
         if m:
             candidate = m.group(1)
             break
+    
     if candidate:
         parsed = safe_json_loads(candidate)
         if parsed:
@@ -665,6 +761,7 @@ def get_item_data(market_hash_name: str) -> Dict[str, Any]:
                     history.append([date_part, price_part, vol_val])
     else:
         history = []
+    
     # Парсинг total_listings (unchanged)
     total_listings = 0
     paging_summary = soup.find("div", class_="market_paging_summary ellipsis")
@@ -677,11 +774,13 @@ def get_item_data(market_hash_name: str) -> Dict[str, Any]:
             total_span = soup.find("span", id="searchResults_total")
             if total_span:
                 total_listings = int(total_span.text.strip())
+    
     # Парсинг таблиц ордеров
     sell_graph = parse_order_table(soup, "market_commodity_forsale_table")
     buy_graph = parse_order_table(soup, "market_commodity_buyreqeusts_table")
     sell_listings = float(sell_graph[-1][1]) if sell_graph else 0
     buy_orders = float(buy_graph[-1][1]) if buy_graph else 0
+    
     # Fallback к API
     histogram = None
     if not sell_graph or not buy_graph:
@@ -696,7 +795,7 @@ def get_item_data(market_hash_name: str) -> Dict[str, Any]:
                     break
         if item_nameid:
             histogram_url = f"https://steamcommunity.com/market/itemordershistogram?country=RU&language=russian&currency=5&item_nameid={item_nameid}&two_factor=0&norender=1"
-            r_hist = request_with_retries(histogram_url, timeout=20)
+            r_hist = request_with_retries(histogram_url, timeout=20, use_proxy_on_429=True)
             if r_hist and r_hist.status_code == 200:
                 j = r_hist.json()
                 if 'success' in j and j['success'] == 1:
@@ -716,6 +815,7 @@ def get_item_data(market_hash_name: str) -> Dict[str, Any]:
             "graph_max_x": max_x,
             "graph_max_y": max_y
         }
+    
     # Парсинг lowest price
     price_span = soup.find("span", class_="market_listing_price market_listing_price_with_fee")
     price_usd = 0.0
@@ -726,63 +826,49 @@ def get_item_data(market_hash_name: str) -> Dict[str, Any]:
             price_usd = float(usd_match.group(1))
         else:
             price_usd = parse_price_text(price_text)
-    # ИЗМЕНЕНО: Улучшенный парсинг image_url — по классу вместо id, с fallback'ами
+    
+    # ИЗМЕНЕНО: НЕ пытаемся парсить изображение со Steam - используем только из JSON
     image_url = ""
-    # Основной поиск: img в .market_listing_largeimage
-    image_elem = soup.select_one(".market_listing_largeimage img")
-    if image_elem:
-        image_url = image_elem.get('src') or image_elem.get('data-src', '') or image_elem.get('srcset', '').split(',')[0].strip().split(' ')[0]
-        logger.debug(f"Found image via .market_listing_largeimage: {image_url}")
-    # Fallback 1: img в hover (largeiteminfo_item_icon)
-    if not image_url:
-        image_elem = soup.find("img", id="largeiteminfo_item_icon")
-        if image_elem:
-            image_url = image_elem.get('src') or image_elem.get('data-src', '') or image_elem.get('srcset', '').split(',')[0].strip().split(' ')[0]
-            logger.debug(f"Found image via largeiteminfo_item_icon: {image_url}")
-    # Fallback 2: Старый поиск (на всякий случай)
-    if not image_url:
-        image_elem = soup.find("img", id="largeItemImage")
-        if image_elem:
-            image_url = image_elem.get('src') or image_elem.get('data-src', '') or image_elem.get('srcset', '').split(',')[0].strip().split(' ')[0]
-            logger.debug(f"Found image via largeItemImage: {image_url}")
-    # Нормализация: добавляем протокол/хост если относительный
-    if image_url and not image_url.startswith('http'):
-        image_url = f"https://steamcommunity.com{image_url}"
-    # Финальная проверка и лог
-    if image_url:
-        logger.info(f"Successfully parsed image URL for {market_hash_name}: {image_url}")
-    else:
-        logger.warning(f"Failed to parse image URL for {market_hash_name} — will use fallback from JSON")
-    # No fallback here, handle in main loop
+    # Всегда возвращаем пустую строку для image_url, чтобы потом использовать fallback из JSON
+    logger.info(f"Image parsing skipped for {market_hash_name} - will use JSON fallback only")
+    
     return {
         "history": history,
         "sell_listings": sell_listings,
         "buy_orders": buy_orders,
         "total_listings": total_listings,
         "price_usd": price_usd,
-        "image_url": image_url,
+        "image_url": image_url,  # Всегда пустая строка
         "histogram": histogram
     }
+
 # ===================== ФУНКЦИЯ FETCH ИЗОБРАЖЕНИЯ (ОБНОВЛЁННАЯ) =====================
 def fetch_item_image(image_url: str, mhn: str, max_retries: int = 5) -> tuple[BytesIO, bool]:
     """Fetch image with retries. Returns (buf, is_placeholder)."""
     is_placeholder = False
-    if not image_url:
-        logger.warning(f"No image URL for {mhn} — generating placeholder")
-        is_placeholder = True
-        return create_placeholder_image(mhn), is_placeholder
+    
+    # ИСПРАВЛЕНИЕ: Если image_url пустая или это Steam URL, НЕ пытаемся его скачать
+    # Используем только изображения из JSON (обычно это community.cloud.steamstatic.com)
+    if not image_url or "steamcommunity.com/market" in image_url:
+        logger.warning(f"Skipping Steam image parsing for {mhn}, using JSON fallback")
+        # Получаем изображение из JSON fallback
+        return create_placeholder_image(mhn), True
+    
     cache_key = hashlib.md5(image_url.encode()).hexdigest()
     now_ts = time.time()
+    
     if cache_key in image_cache and (now_ts - image_cache[cache_key].get("timestamp", 0)) < IMAGE_CACHE_TTL:
         # Восстанавливаем из base64
         buf = BytesIO(base64.b64decode(image_cache[cache_key]["data"]))
         logger.info(f"Image cache hit for {mhn}")
         return buf, False # Кэш — это реальная картинка
+    
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "https://steamcommunity.com/market/",
         "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"
     }
+    
     for attempt in range(max_retries):
         try:
             r_img = session.get(image_url, headers=headers, timeout=15, allow_redirects=True)
@@ -806,10 +892,12 @@ def fetch_item_image(image_url: str, mhn: str, max_retries: int = 5) -> tuple[By
   
         if attempt < max_retries - 1:
             time.sleep(2 + random.uniform(0, 3))
+    
     # Если все ретраи fail — placeholder
     logger.warning(f"All retries failed for {mhn}, using placeholder")
     is_placeholder = True
     return create_placeholder_image(mhn), is_placeholder
+
 def create_placeholder_image(mhn: str) -> BytesIO:
     """Генерируем placeholder: тёмный фон + текст скина + логотип."""
     try:
@@ -840,6 +928,7 @@ def create_placeholder_image(mhn: str) -> BytesIO:
     except Exception as e:
         logger.error(f"Placeholder error: {e}")
         return create_empty_buf() # Ultimate fallback
+
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 def parse_price_text(s):
     if isinstance(s, (int, float)):
@@ -851,16 +940,19 @@ def parse_price_text(s):
         return float(s)
     except ValueError:
         return 0.0
+
 def format_usd(price: float) -> str:
     if price == 0:
         return "$0.00"
     return f"${price:.2f}"
+
 def format_rub(price: float) -> str:
     if price == 0:
         return "0,00₽"
     int_part = f"{int(price):,}".replace(",", " ")
     dec_part = f"{price:.2f}".split(".")[1]
     return f"{int_part},{dec_part}₽"
+
 def parse_volume(s):
     if isinstance(s, int):
         return s
@@ -872,6 +964,7 @@ def parse_volume(s):
         return int(s) if s else 0
     except ValueError:
         return 0
+
 def df_from_pricehistory(prices_raw, usd_rate: float = USD_RATE):
     rows = []
     now = datetime.now(tz=TZ)
@@ -903,6 +996,7 @@ def df_from_pricehistory(prices_raw, usd_rate: float = USD_RATE):
         df = df.sort_values("timestamp").reset_index(drop=True)
         df["price_rub"] = df["price_usd"] * usd_rate
     return df
+
 def make_serializable(obj):
     if isinstance(obj, dict):
         return {k: make_serializable(v) for k, v in obj.items()}
@@ -914,6 +1008,7 @@ def make_serializable(obj):
         else:
             return obj.item()
     return obj
+
 def analyze_dataframe(df: pd.DataFrame, current_median: float, current_volume: int):
     if df.empty or len(df) < 2:
         return {
@@ -929,11 +1024,14 @@ def analyze_dataframe(df: pd.DataFrame, current_median: float, current_volume: i
     avg_price = float(prices.mean())
     stdev_price = float(prices.std(ddof=0))
     volatility = (stdev_price / avg_price * 100) if avg_price > 0 else 0.0
+    
     now = datetime.now(tz=TZ)
     last_24h_start = now - timedelta(hours=24)
     prev_24h_start = now - timedelta(hours=48)
     prev_24h_end = last_24h_start
+    
     last_24h = df[df["timestamp"] >= last_24h_start]
+    
     # Prev price: цена closest to exactly 24h ago
     exact_24h_ago = now - timedelta(hours=24)
     # Filter to prev period for safety
@@ -943,7 +1041,9 @@ def analyze_dataframe(df: pd.DataFrame, current_median: float, current_volume: i
         prev_price = prev_candidates.loc[closest_idx, "price_usd"]
     else:
         prev_price = avg_price
+    
     price_growth = ((current_median - prev_price) / prev_price * 100) if prev_price > 0 else 0.0
+    
     prev_volume = prev_candidates["volume"].sum() if not prev_candidates.empty else 0
     volume_growth = 0.0
     if prev_volume > 0:
@@ -952,6 +1052,7 @@ def analyze_dataframe(df: pd.DataFrame, current_median: float, current_volume: i
         volume_growth = 100.0
     elif current_volume == 0:
         volume_growth = -100.0
+    
     week_start = now - timedelta(days=HISTORY_DAYS)
     week_df = df[df["timestamp"] >= week_start]
     max_price_week = week_df["price_usd"].max() if not week_df.empty else 0.0
@@ -967,6 +1068,7 @@ def analyze_dataframe(df: pd.DataFrame, current_median: float, current_volume: i
             range_breakout = ((current_median - max_price_week) / max_price_week * 100)
         elif current_median < lower_bound:
             range_breakout = ((current_median - min_price_week) / min_price_week * 100) * -1
+    
     return {
         "volatility": round(volatility, 2),
         "price_growth": round(price_growth, 2),
@@ -976,10 +1078,12 @@ def analyze_dataframe(df: pd.DataFrame, current_median: float, current_volume: i
         "is_sideways": is_sideways,
         "range_percent": round(range_percent, 2)
     }
+
 def clean_tag(n: str) -> str:
     """Очистка строки для хэштега: удаляем все кроме букв, цифр, и приводим к нижнему регистру."""
     cleaned = re.sub(r'[^a-zа-яё0-9]', '', n.lower())
     return cleaned
+
 def extract_skin_type(mhn: str) -> str:
     """Извлекает тип скина (модель оружия/ножа) из market_hash_name."""
     name_lower = mhn.lower()
@@ -995,6 +1099,7 @@ def extract_skin_type(mhn: str) -> str:
         candidate = re.sub(r'[^\wа-яё]', '', candidate)
         return candidate
     return ""
+
 def get_item_type_and_hashtags(market_hash_name: str, item: dict) -> tuple[str, str]:
     hashtags = ""
     name_lower = market_hash_name.lower()
@@ -1004,6 +1109,7 @@ def get_item_type_and_hashtags(market_hash_name: str, item: dict) -> tuple[str, 
     cat_name = category_dict.get('name', '').lower() if isinstance(category_dict, dict) else str(item.get('category', '')).lower()
     pattern_dict = item.get('pattern', {})
     skin_name = pattern_dict.get('name', '') if isinstance(pattern_dict, dict) else str(item.get('pattern', ''))
+    
     if weapon:
         cat = 'other'
         for c, keywords in CATEGORY_KEYWORDS.items():
@@ -1015,6 +1121,7 @@ def get_item_type_and_hashtags(market_hash_name: str, item: dict) -> tuple[str, 
         skin_tag = clean_tag(skin_name)
         hashtags = f"{cat_tag} #{weapon_tag} #{skin_tag}"
         return "weapon", hashtags
+    
     if "sticker" in name_lower or "наклейка" in name_lower:
         hashtags = "#наклейка"
         # Новый подход: парсим market_hash_name по "|"
@@ -1083,6 +1190,7 @@ def get_item_type_and_hashtags(market_hash_name: str, item: dict) -> tuple[str, 
                     hashtags += f" #{tour_tag}"
   
         return "sticker", hashtags
+    
     other_types = {
         "container": "#контейнер",
         "case": "#кейс",
@@ -1093,11 +1201,14 @@ def get_item_type_and_hashtags(market_hash_name: str, item: dict) -> tuple[str, 
         "patch": "#патч",
         "graffiti": "#граффити"
     }
+    
     name_lower = market_hash_name.lower()
     for otype, tag in other_types.items():
         if otype in name_lower:
             return otype, tag
+    
     return "other", "#другое"
+
 def is_similar_to_recently_posted(mhn: str, posted_log: List[str], posted_history: List[Dict], similarity_threshold: int = 3):
     item_type, _ = get_item_type_and_hashtags(mhn, {})
     skin = extract_skin_type(mhn)
@@ -1110,6 +1221,7 @@ def is_similar_to_recently_posted(mhn: str, posted_log: List[str], posted_histor
             similar_count += 1
         # Удален elif, так как логика на основе skin_type теперь покрывает типы (включая ножи)
     return similar_count >= 1
+
 def item_passes_criteria(item: dict, posted_log: List[str], posted_history: List[Dict]) -> tuple[bool, str]:
     if item.get("price_usd", 0) < MIN_PRICE:
         return False, f"price < {MIN_PRICE}"
@@ -1128,6 +1240,7 @@ def item_passes_criteria(item: dict, posted_log: List[str], posted_history: List
     if item.get("volatility", 0) > VOLATILITY_THRESHOLD or abs(growth) >= PRICE_CHANGE_THRESHOLD:
         return True, "volatility or price change"
     return False, "no criteria met"
+
 def create_empty_buf():
     buf = BytesIO()
     try:
@@ -1143,10 +1256,12 @@ def create_empty_buf():
         logger.warning(f"Error creating empty buf: {e}")
     buf.seek(0)
     return buf
+
 def russian_month_formatter(x, pos):
     dt = mdates.num2date(x)
     months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
     return f"{dt.day:02d} {months[dt.month - 1]}"
+
 def overlay_logo_on_image(buf: BytesIO, position: str = "top_right", opacity: float = 1.0, is_graph: bool = False):
     try:
         img = Image.open(buf).convert("RGBA")
@@ -1185,13 +1300,16 @@ def overlay_logo_on_image(buf: BytesIO, position: str = "top_right", opacity: fl
         img.save(new_buf, format='PNG')
         new_buf.seek(0)
         return new_buf
+
 def plot_price_week(df: pd.DataFrame, title: str):
     if df.empty:
         return create_empty_buf()
+    
     now = datetime.now(tz=TZ)
     week_df = df[df["timestamp"] >= (now - timedelta(days=HISTORY_DAYS))]
     if week_df.empty:
         week_df = df.copy()
+    
     try:
         fig, ax = plt.subplots(figsize=(8, 3))
         ax.plot(week_df["timestamp"], week_df["price_rub"], linestyle='-', color='#00a1d6', linewidth=1.5)
@@ -1213,13 +1331,16 @@ def plot_price_week(df: pd.DataFrame, title: str):
     except Exception as e:
         logger.warning(f"Error plotting price: {e}")
         return create_empty_buf()
+
 def plot_volume_week(df: pd.DataFrame, title: str):
     if df.empty:
         return create_empty_buf()
+    
     now = datetime.now(tz=TZ)
     week_df = df[df["timestamp"] >= (now - timedelta(days=HISTORY_DAYS))]
     if week_df.empty:
         week_df = df.copy()
+    
     try:
         fig, ax = plt.subplots(figsize=(8, 3))
         ax.plot(week_df["timestamp"], week_df["volume"], linestyle='-', color='#00a1d6', linewidth=1.5)
@@ -1241,10 +1362,12 @@ def plot_volume_week(df: pd.DataFrame, title: str):
     except Exception as e:
         logger.warning(f"Error plotting volume: {e}")
         return create_empty_buf()
+
 def build_plots(item: dict, days: int = HISTORY_DAYS) -> tuple[BytesIO, BytesIO, BytesIO]:
     df = df_from_pricehistory(item.get("history_raw", []), item.get("usd_rate", USD_RATE))
     price_buf = plot_price_week(df, f"Динамика цены за {days} дней — {item['name']}")
     volume_buf = plot_volume_week(df, f"Объём продаж за {days} дней — {item['name']}")
+    
     histogram = item.get("histogram")
     if not histogram or not histogram.get("buy_order_graph") or not histogram.get("sell_order_graph"):
         order_buf = create_empty_buf()
@@ -1283,18 +1406,23 @@ def build_plots(item: dict, days: int = HISTORY_DAYS) -> tuple[BytesIO, BytesIO,
         except Exception as e:
             logger.warning(f"Error building order plot: {e}")
             order_buf = create_empty_buf()
+    
     return price_buf, volume_buf, order_buf
+
 def extract_steam_url_from_text(text: str) -> Optional[str]:
     match = re.search(r'<a href="([^"]+)"', text)
     if match and "steamcommunity.com/market" in match.group(1):
         return match.group(1)
     return None
+
 def send_media_group_telegram(media_files, caption="", message_id=None):
     if not media_files:
         return None
+    
     send_url = f"https://api.telegram.org/bot{TOKEN}/sendMediaGroup"
     media_list = []
     group_files = {}
+    
     for i, (file_type, file_data) in enumerate(media_files):
         group_files[f"{file_type}{i}"] = file_data
         media_item = {"type": "photo", "media": f"attach://{file_type}{i}"}
@@ -1302,10 +1430,12 @@ def send_media_group_telegram(media_files, caption="", message_id=None):
             media_item["caption"] = caption
             media_item["parse_mode"] = "HTML"
         media_list.append(media_item)
+    
     group_payload = {
         "chat_id": CHAT_ID,
         "media": json.dumps(media_list)
     }
+    
     max_retries = 2
     for retry in range(max_retries + 1):
         try:
@@ -1330,6 +1460,7 @@ def send_media_group_telegram(media_files, caption="", message_id=None):
             time.sleep(5)
             continue
     return None
+
 def send_message_telegram(text: str, message_id=None) -> Optional[int]:
     send_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     payload = {
@@ -1348,8 +1479,10 @@ def send_message_telegram(text: str, message_id=None) -> Optional[int]:
     except Exception as e:
         logger.error(f"Error in sendMessage: {e}")
         return None
+
 def send_maintenance_message():
     send_message_telegram(MAINTENANCE_MESSAGE)
+
 def load_posted_history() -> List[Dict]:
     if os.path.exists(POSTED_HISTORY_FILE):
         try:
@@ -1362,6 +1495,7 @@ def load_posted_history() -> List[Dict]:
             logger.error(f"Error loading posted history: {e}")
             pass
     return []
+
 def save_posted_history(message_id: int, data: Dict):
     try:
         history = load_posted_history()
@@ -1381,6 +1515,7 @@ def save_posted_history(message_id: int, data: Dict):
             json.dump(history, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Error saving posted history: {e}")
+
 def get_similar_posts(mhn: str) -> List[str]:
     history = load_posted_history()
     item_type, _ = get_item_type_and_hashtags(mhn, {})
@@ -1395,6 +1530,7 @@ def get_similar_posts(mhn: str) -> List[str]:
         if skin and post_skin == skin:
             similar.append(f'<a href="https://t.me/c/{CHAT_ID[4:]}/{post["message_id"]}">{html.escape(post["mhn"])}</a>')
     return similar
+
 def load_posted_log() -> List[str]:
     if os.path.exists(LOG_FILE):
         try:
@@ -1408,12 +1544,14 @@ def load_posted_log() -> List[str]:
             logger.error(f"Error loading posted log: {e}")
             pass
     return []
+
 def save_posted_log(log: List[str]):
     try:
         with open(LOG_FILE, "w", encoding="utf-8") as f:
             json.dump(log, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Error saving posted log: {e}")
+
 def unpin_and_pin_summary(summary_message_id: int):
     try:
         unpin_url = f"https://api.telegram.org/bot{TOKEN}/unpinChatMessage"
@@ -1425,6 +1563,7 @@ def unpin_and_pin_summary(summary_message_id: int):
         session.post(pin_url, data=pin_payload, timeout=10)
     except Exception as e:
         logger.warning(f"Error pinning summary: {e}")
+
 # ИЗМЕНЕНО: Улучшена функция для summary — добавлено больше логирования, fallback для пустых изображений, водяной знак с opacity=0.8
 # ИЗМЕНЕНО: Для итогов только текст, без изображений
 def generate_daily_summary(posted_items: List[Dict], posted_log: List[str]):
@@ -1433,16 +1572,20 @@ def generate_daily_summary(posted_items: List[Dict], posted_log: List[str]):
         logger.warning("No posted items found for summary - check if publications occurred in last 24h")
         combined_caption = "🕐 ИТОГИ за 24 часа:\n\n🟢 ТОП-5 предметов по росту:\n\nНет предметов с ростом цены за последние 24 часа.\n\n🔴 ТОП-5 предметов по падению:\n\nНет предметов с падением цены за последние 24 часа.\n"
         return combined_caption, [] # Только текст
+    
     top_growth = sorted(
         [item for item in posted_items if item.get("growth", 0) > 0],
         key=lambda x: x.get("growth", 0),
         reverse=True
     )[:5]
+    
     top_decline = sorted(
         [item for item in posted_items if item.get("growth", 0) < 0],
         key=lambda x: x.get("growth", 0)
     )[:5]
+    
     logger.info(f"Top growth items: {len(top_growth)}, Top decline: {len(top_decline)}")
+    
     growth_text = "🟢 ТОП-5 предметов по росту:\n\n"
     for i, item in enumerate(top_growth, 1):
         steam_url = f"https://steamcommunity.com/market/listings/{APPID}/{quote(item.get('market_hash_name', ''), safe='')}"
@@ -1452,6 +1595,7 @@ def generate_daily_summary(posted_items: List[Dict], posted_log: List[str]):
         )
     if not top_growth:
         growth_text += "Нет предметов с ростом цены за последние 24 часа.\n"
+    
     decline_text = "🔴 ТОП-5 предметов по падению:\n\n"
     for i, item in enumerate(top_decline, 1):
         steam_url = f"https://steamcommunity.com/market/listings/{APPID}/{quote(item.get('market_hash_name', ''), safe='')}"
@@ -1461,9 +1605,11 @@ def generate_daily_summary(posted_items: List[Dict], posted_log: List[str]):
         )
     if not top_decline:
         decline_text += "Нет предметов с падением цены за последние 24 часа.\n"
+    
     combined_caption = f"🕐 ИТОГИ за 24 часа:\n\n{growth_text}\n{decline_text}"
     # ИЗМЕНЕНО: Только текст, без media
     return combined_caption, []
+
 def send_summary_parts(combined_caption, combined_media):
     sent = False
     sent_id = None
@@ -1478,14 +1624,18 @@ def send_summary_parts(combined_caption, combined_media):
     else:
         print("[WARN] Summary send failed")
         logger.warning("Summary send failed")
+    
     return sent, sent_id
+
 # ===================== MAIN =====================
 def main():
     global USD_RATE, USE_PROXY, image_cache
+    
     parser = argparse.ArgumentParser(description="CSGO Market Analyzer")
     parser.add_argument('--send-summary', action='store_true', help="Send daily summary of top growth and decline items")
     parser.add_argument('--summary-time', type=str, default=DEFAULT_SUMMARY_TIME, help="Time to send summary in HH:MM format")
     args = parser.parse_args()
+    
     if args.send_summary:
         posted_log = load_posted_log()
         posted_items = load_posted_items(for_summary=True)
@@ -1507,17 +1657,21 @@ def main():
             clear_image_cache() # Очистка кэша изображений
             logger.info("Manual summary sent and cleanup completed")
         return
+    
     log_event("startup", "Bot started")
     USD_RATE = get_usd_to_rub_rate()
+    
     try:
         summary_time = datetime.strptime(args.summary_time, "%H:%M").time()
     except ValueError:
         summary_time = datetime.strptime(DEFAULT_SUMMARY_TIME, "%H:%M").time()
+    
     last_summary_sent = load_last_summary()
     if last_summary_sent:
         log_event("summary_load", f"Last summary sent on: {last_summary_sent}")
     else:
         log_event("summary_load", "No previous summary found")
+    
     if USE_PROXY:
         try:
             r = session.get("https://api.ipify.org?format=json", timeout=10)
@@ -1533,21 +1687,27 @@ def main():
             disable_proxy()
     else:
         disable_proxy()
+    
     items_raw = load_items()
     valid_items = get_valid_items(items_raw)
     total_items = len(valid_items)
     log_event("items_loaded", f"Loaded {total_items} items")
+    
     if total_items == 0:
         log_event("no_items", "No valid items loaded. Skipping scan cycle.")
         time.sleep(3600)
         return main()
+    
     random.shuffle(valid_items)
     log_event("shuffle_done", "Shuffled items list")
+    
     posted_log = load_posted_log()
     posted_history = load_posted_history()
     item_cache = load_cache()
     image_cache = load_image_cache() # Загрузка кэша изображений
+    
     consecutive_errors = 0
+    
     while True:
         now_local = datetime.now(tz=TZ)
         target_time = now_local.replace(hour=summary_time.hour, minute=summary_time.minute, second=0, microsecond=0)
@@ -1576,6 +1736,7 @@ def main():
   
         prep_time_to_target = time_to_target - (SUMMARY_PREP_MINUTES * 60)
         is_prep_mode = (prep_time_to_target <= 0 and time_to_target > 0)
+        
         if is_prep_mode:
             prep_minutes = time_to_target / 60
             print(f"[INFO] Entering prep mode for top items summary (remaining: {prep_minutes:.1f} min)")
@@ -1630,8 +1791,10 @@ def main():
                 log_event("summary_send_failed", "Top items summary send failed, no cleanup")
             time.sleep(REQUEST_DELAY + random.random() * JITTER)
             continue
+        
         log_event("scan_cycle_start", "Starting new scan cycle")
         item_counter = 0
+        
         for item in valid_items:
             # Recalculate time inside loop to catch summary during scan
             now_local = datetime.now(tz=TZ)
@@ -1696,16 +1859,21 @@ def main():
                     print_progress(item_counter, total_items)
                 if item_counter % MONITOR_INTERVAL == 0:
                     print_resource_usage(item_counter, total_items)
+                
                 mhn = build_market_hash_name(item)
                 if not mhn:
                     continue
+                
                 item["market_hash_name"] = mhn
                 if mhn in posted_log:
                     continue
+                
                 log_event("item_processing", f"Processing item: {mhn}", mhn)
                 time.sleep(REQUEST_DELAY + random.random() * JITTER)
+                
                 cache_key = hashlib.md5(mhn.encode()).hexdigest()
                 now_ts = time.time()
+                
                 if cache_key in item_cache and (now_ts - item_cache[cache_key].get("timestamp", 0)) < CACHE_TTL:
                     data = item_cache[cache_key]["data"]
                     log_event("cache_hit", "Cache hit", mhn)
@@ -1721,14 +1889,17 @@ def main():
                     else:
                         log_event("data_fetch_failed", "Failed to fetch data", mhn)
                         continue
+                
                 raw_history = data["history"]
                 if not raw_history:
                     log_event("no_history", "No history data", mhn)
                     continue
+                
                 quick_data = quick_parse_history(raw_history, USD_RATE)
                 if not quick_data["prices"]:
                     log_event("empty_quick_data", "Empty quick parse data", mhn)
                     continue
+                
                 item["price_usd"] = data["price_usd"] if data["price_usd"] > 0 else quick_data["current_price_usd"]
                 item["price_rub"] = item["price_usd"] * USD_RATE
                 item["volume_24h"] = quick_data["volume_24h"]
@@ -1737,28 +1908,36 @@ def main():
                 item["history_raw"] = raw_history
                 item["histogram"] = data.get("histogram")
                 item["usd_rate"] = USD_RATE
-                # Handle image_url fallback here (как в старом коде)
+                
+                # ВАЖНОЕ ИСПРАВЛЕНИЕ: Не используем image_url из парсинга Steam
+                # Всегда используем только изображение из JSON
                 fallback_image = item.get('image', '')
-                item["image_url"] = data["image_url"] or ""
+                item["image_url"] = ""  # Всегда пустая строка - НЕ парсим со Steam
+                
+                # Используем fallback из JSON если есть
                 if not item["image_url"] and fallback_image:
                     if fallback_image.startswith('http'):
                         item["image_url"] = fallback_image
                     else:
                         item["image_url"] = f"https://community.cloud.steamstatic.com/economy/image/{fallback_image}/360fx360f"
+                
                 item["name"] = item.get("name", mhn)
                 item["publications"] = 1
                 item["sell_listings"] = data["sell_listings"]
                 item["buy_orders"] = data["buy_orders"]
                 item["total_listings"] = data["total_listings"]
+                
                 prices_np = np.array(quick_data["prices"])
                 volatility_approx = (prices_np.std() / prices_np.mean() * 100) if prices_np.mean() > 0 else 0.0
                 item["volatility"] = volatility_approx
+                
                 passed, reason = item_passes_criteria(item, posted_log, posted_history)
                 if passed:
                     df = df_from_pricehistory(raw_history, USD_RATE)
                     analysis = analyze_dataframe(df, item["price_usd"], item["volume_24h"])
                     item.update({k: v for k, v in analysis.items() if k not in item})
                     log_event("criteria_passed", f"Item passed criteria: {reason}", mhn)
+                    
                     # Move CSV saving inside if passed
                     safe_name = re.sub(r"[^\w\-_.() ]", "_", mhn)[:120]
                     csv_name = os.path.join(OUT_DIR, f"prices_{safe_name}.csv")
@@ -1767,8 +1946,10 @@ def main():
                         log_event("csv_saved", f"CSV saved for item", mhn)
                     except Exception as e:
                         logger.warning(f"Error saving CSV: {e}")
+                    
                     price_buf, volume_buf, order_buf = build_plots(item, HISTORY_DAYS)
                     log_event("plots_generated", "Plots generated", mhn)
+                    
                     steam_url = f"https://steamcommunity.com/market/listings/{APPID}/{quote(mhn, safe='')}"
                     growth_sign = "+" if item["growth"] >= 0 else ""
                     volume_sign = "+" if item["volume_change"] >= 0 else ""
@@ -1789,18 +1970,21 @@ def main():
                         f"🔗 Схожие публикации за сутки: {similar_text}\n\n"
                         f"{hashtags}"
                     )
+                    
                     media_files = []
-                    # НОВОЕ: Fetch image и проверка на placeholder
+                    # Fetch image - теперь используем только JSON fallback
                     img_buf, is_placeholder = fetch_item_image(item.get("image_url"), mhn)
                     if is_placeholder:
-                        log_event("skip_no_image", "Skipping post due to no real image available", mhn)
-                        continue # Пропускаем весь пост!
+                        logger.info(f"Using placeholder/JSON fallback image for {mhn}")
+                    
                     img_buf = overlay_logo_on_image(img_buf, "top_right", 1.0, is_graph=False)
                     media_files.append(('photo', img_buf.getvalue()))
-                    logger.info(f"Real image prepared for post: {mhn}")
+                    logger.info(f"Image prepared for post: {mhn}")
+                    
                     media_files.append(('photo', price_buf.getvalue()))
                     media_files.append(('photo', volume_buf.getvalue()))
                     media_files.append(('photo', order_buf.getvalue()))
+                    
                     sent_id = send_media_group_telegram(media_files, caption)
               
                     if sent_id:
@@ -1836,6 +2020,7 @@ def main():
                                 consecutive_errors = 0
                 else:
                     log_event("criteria_failed", f"Item failed criteria: {reason}", mhn)
+                    
             except Exception as e:
                 consecutive_errors += 1
                 mhn = item.get('market_hash_name', 'unknown')
@@ -1846,12 +2031,14 @@ def main():
                     consecutive_errors = 0
                 time.sleep(REQUEST_DELAY + random.random() * JITTER)
                 continue
+        
         # НОВЫЙ БЛОК: Проверка summary после for-цикла (для prep_interrupt)
         now_local = datetime.now(tz=TZ)
         target_time = now_local.replace(hour=summary_time.hour, minute=summary_time.minute, second=0, microsecond=0)
         if target_time <= now_local:
             target_time += timedelta(days=1)
         time_to_target = (target_time - now_local).total_seconds()
+        
         if time_to_target <= 0 and not summary_sent_in_24h:
             print("[INFO] Summary time hit after scan interruption! Generating and sending top items summary")
             log_event("summary_after_interrupt", "Summary after prep_interrupt in scan")
@@ -1890,13 +2077,17 @@ def main():
                 log_event("summary_send_failed", "Top items summary send failed, no cleanup")
             time.sleep(REQUEST_DELAY + random.random() * JITTER)
             continue # Выходим из while, чтобы не спать до next minute
+        
         print_resource_usage(item_counter, total_items)
         print_progress(item_counter, total_items)
         log_event("scan_cycle_end", "Scan cycle completed")
+        
         now_eest = datetime.now(tz=EEST_TZ)
         seconds_to_next_minute = 60 - now_eest.second
         time.sleep(seconds_to_next_minute)
+    
     save_cache(item_cache)
     save_image_cache(image_cache)
+
 if __name__ == "__main__":
     main()
