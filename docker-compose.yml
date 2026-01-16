@@ -1,11 +1,39 @@
+version: '3.9'
+
 services:
   mybot:
     build: .
-    container_name: mybot4
+    container_name: mybot3
     restart: always
     working_dir: /app
     volumes:
       - ./:/app
-    ports:
-      - "8080:8080"
-    command: python Scanner.py
+
+    # ──────────────────────────────── РЕКОМЕНДУЕМЫЕ ЛИМИТЫ ────────────────────────────────
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'           # 1 полное ядро — комфортно даже при пике
+          memory: 1536M         # 1.5 GB — надёжный запас (хватит с головой)
+        reservations:
+          cpus: '0.4'           # гарантируем хотя бы 40% ядра
+          memory: 768M          # минимум, который Docker резервирует
+
+    # Альтернативный синтаксис (если deploy не работает — старый docker-compose)
+    # cpus: 1.0
+    # mem_limit: 1536m
+    # mem_reservation: 768m
+
+    ulimits:
+      nproc: 200              # чуть больше процессов — безопасно
+      nofile:
+        soft: 2048
+        hard: 8192
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    tty: true
