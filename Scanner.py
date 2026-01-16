@@ -35,7 +35,7 @@ LOCAL_DB = "items.json"
 APPID = 730
 # Telegram
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "8427688497:AAGkBisiTfJM3RDc8DOG9Kx9l9EnekoFGQk")
-CHAT_ID = os.environ.get("CHAT_ID", "-1003143360650")
+CHAT_ID = os.environ.get("CHAT_ID", "-1003215068555")
 MONITOR_BOT_CHAT_ID = os.environ.get("MONITOR_BOT_CHAT_ID", "873939087") # ID приватного чата с монитор-ботом (опционально)
 # Steam sessionid
 SESSIONID = os.environ.get("STEAM_SESSIONID", None)
@@ -1111,23 +1111,78 @@ def is_similar_to_recently_posted(mhn: str, posted_log: List[str], posted_histor
         # Удален elif, так как логика на основе skin_type теперь покрывает типы (включая ножи)
     return similar_count >= 1
 def item_passes_criteria(item: dict, posted_log: List[str], posted_history: List[Dict]) -> tuple[bool, str]:
+    """
+    Проверяет, проходит ли предмет критерии для публикации.
+    Возвращает (прошёл ли, причина)
+    """
+    mhn = item.get("market_hash_name", "")
+    if not mhn:
+        return False, "нет market_hash_name"
+
+    mhn_lower = mhn.lower()
+
+    # ──────────────────────────────────────────────────────────────
+    # ЖЁСТКАЯ ФИЛЬТРАЦИЯ КЕЙСОВ / КОНТЕЙНЕРОВ / КАПСУЛ
+    # ──────────────────────────────────────────────────────────────
+    # 1. По типу предмета (самый надёжный способ)
+    item_type, _ = get_item_type_and_hashtags(mhn, item)
+    if item_type in ("container", "case"):
+        return False, "кейс/контейнер по типу"
+
+    # 2. По ключевым словам в названии (страховка на случай ошибок в типизации)
+    case_keywords = [
+        "case", "кейс", "контейнер", "capsule", "капсула",
+        "weapon case", "sticker capsule", "autograph capsule",
+        "souvenir package", "сувенирный набор", "esports 2013", "dreamhack"
+    ]
+    
+    if any(keyword in mhn_lower for keyword in case_keywords):
+        return False, "кейс/капсула/контейнер по названию"
+
+    # 3. Дополнительная проверка по категориям из JSON (если есть)
+    category = str(item.get("category", {})).lower()
+    if any(x in category for x in ["case", "container", "capsule", "package"]):
+        return False, "кейс/контейнер по категории"
+
+    # ──────────────────────────────────────────────────────────────
+    # Основные ценовые и объёмные фильтры
+    # ──────────────────────────────────────────────────────────────
     if item.get("price_usd", 0) < MIN_PRICE:
-        return False, f"price < {MIN_PRICE}"
+        return False, f"цена ниже минимальной ({MIN_PRICE}$)"
+
     if item.get("volume_24h", 0) < MIN_VOLUME_24H:
-        return False, f"volume < {MIN_VOLUME_24H}"
+        return False, f"объём 24ч меньше минимального ({MIN_VOLUME_24H})"
+
     growth = item.get("growth", 0)
     if abs(growth) < PRICE_CHANGE_THRESHOLD:
-        return False, f"price change < {PRICE_CHANGE_THRESHOLD}%"
-    mhn = item.get("market_hash_name", "")
-    if mhn in posted_log or is_similar_to_recently_posted(mhn, posted_log, posted_history):
-        return False, "similar to recently posted"
+        return False, f"изменение цены меньше порога ({PRICE_CHANGE_THRESHOLD}%)"
+
+    # ──────────────────────────────────────────────────────────────
+    # Проверка на дубли/похожие уже опубликованные предметы
+    # ──────────────────────────────────────────────────────────────
+    if mhn in posted_log:
+        return False, "уже публиковался (точное совпадение)"
+
+    if is_similar_to_recently_posted(mhn, posted_log, posted_history):
+        return False, "похож на недавно опубликованный"
+
+    # ──────────────────────────────────────────────────────────────
+    # Критерии интересности (основная логика отбора)
+    # ──────────────────────────────────────────────────────────────
     if item.get("is_sideways", False) and item.get("range_breakout", 0) >= 10.0:
-        return True, "range breakout from sideways"
+        return True, "выход из боковика (range breakout)"
+
     if item.get("breakout_percentage", 0) >= BREAKOUT_THRESHOLD:
-        return True, "breakout threshold"
-    if item.get("volatility", 0) > VOLATILITY_THRESHOLD or abs(growth) >= PRICE_CHANGE_THRESHOLD:
-        return True, "volatility or price change"
-    return False, "no criteria met"
+        return True, "пробой уровня (breakout threshold)"
+
+    if item.get("volatility", 0) > VOLATILITY_THRESHOLD:
+        return True, "высокая волатильность"
+
+    if abs(growth) >= PRICE_CHANGE_THRESHOLD:
+        return True, "сильное изменение цены за 24ч"
+
+    # Если ничего из вышеперечисленного не сработало
+    return False, "не проходит по основным критериям"
 def create_empty_buf():
     buf = BytesIO()
     try:
