@@ -35,7 +35,7 @@ LOCAL_DB = "items.json"
 APPID = 730
 # Telegram
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "8427688497:AAGkBisiTfJM3RDc8DOG9Kx9l9EnekoFGQk")
-CHAT_ID = os.environ.get("CHAT_ID", "-1003143360650")
+CHAT_ID = os.environ.get("CHAT_ID", "-1003215068555")
 MONITOR_BOT_CHAT_ID = os.environ.get("MONITOR_BOT_CHAT_ID", "873939087") # ID приватного чата с монитор-ботом (опционально)
 # Steam sessionid
 SESSIONID = os.environ.get("STEAM_SESSIONID", None)
@@ -89,6 +89,10 @@ LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 BOT_LOG_FILE = os.path.join(LOG_DIR, "bot_events.log")
 # Лого
+
+current_proxy_index = 0
+consecutive_proxy_failures = 0
+
 LOGO_PATH = "VS1.png"
 LOGO_OPACITY = 0.7 # ИЗМЕНЕНО: Уменьшено для summary (было 1.0), чтобы водяной знак был заметнее, но не доминировал
 CATEGORY_KEYWORDS = {
@@ -150,10 +154,10 @@ TOURNAMENT_MAP = {
 }
 
 PROXIES = [
-    "http://M9aRJb:upBCUY@217.29.62.214:10744",   # IPv6: 2a06:c006:2834:9dc3:d37d:6463:4f1e:89da
-    "http://M9aRJb:upBCUY@217.29.62.214:10743",   # IPv6: 2a06:c006:ade3:cdb9:7f6c:b2dd:5e4e:27af
-    "http://M9aRJb:upBCUY@217.29.62.214:10742",   # IPv6: 2a06:c006:1044:3305:256c:5a7b:d7ca:6862
-    "http://M9aRJb:upBCUY@217.29.63.40:12724",    # IPv6: 2a06:c006:b785:bc2d:6c8e:2a97:eada:6983
+    "socks5h://M9aRJb:upBCUY@217.29.62.214:10744",   # IPv6: 2a06:c006:2834:9dc3:d37d:6463:4f1e:89da
+    "socks5h://M9aRJb:upBCUY@217.29.62.214:10743",   # IPv6: 2a06:c006:ade3:cdb9:7f6c:b2dd:5e4e:27af
+    "socks5h://M9aRJb:upBCUY@217.29.62.214:10742",   # IPv6: 2a06:c006:1044:3305:256c:5a7b:d7ca:6862
+    "socks5h://M9aRJb:upBCUY@217.29.63.40:12724",    # IPv6: 2a06:c006:b785:bc2d:6c8e:2a97:eada:6983
 ]
 
 # Заглушка
@@ -172,15 +176,21 @@ logger = logging.getLogger(__name__)
 def rotate_proxy():
     global current_proxy_index, consecutive_proxy_failures
     if not PROXIES:
-        logger.warning("PROXIES list is empty — cannot rotate")
+        logger.warning("PROXIES list is empty — disabling proxy")
         disable_proxy()
+        return
+    
+    # Если прошёл полный круг без успеха — отключаем прокси
+    if consecutive_proxy_failures >= len(PROXIES) * 2:
+        disable_proxy()
+        logger.info("All proxies failed multiple times — switching to direct connection (server IP)")
         return
     
     current_proxy_index = (current_proxy_index + 1) % len(PROXIES)
     proxy = PROXIES[current_proxy_index]
     enable_proxy(proxy)
-    consecutive_proxy_failures = 0  # сбрасываем счётчик после ротации
-    logger.info(f"Rotated proxy to {current_proxy_index + 1}/{len(PROXIES)}: {proxy.split('@')[1] if '@' in proxy else proxy}")
+    consecutive_proxy_failures = 0
+    logger.info(f"Rotated to proxy {current_proxy_index + 1}/{len(PROXIES)}: {proxy.split('@')[1]}")
 
 def log_event(stage: str, description: str, item_name: str = None):
     msg = f"Stage: {stage} | Description: {description}"
