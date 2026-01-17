@@ -7,3 +7,4 @@ beautifulsoup4==4.12.3
 lxml==5.3.0
 psutil==6.1.0  # Add this line (latest stable as of 2025)
 Flask==3.0.3
+requests[socks]
