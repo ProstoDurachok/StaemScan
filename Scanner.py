@@ -40,7 +40,7 @@ MONITOR_BOT_CHAT_ID = os.environ.get("MONITOR_BOT_CHAT_ID", "873939087") # ID п
 # Steam sessionid
 SESSIONID = os.environ.get("STEAM_SESSIONID", None)
 # Прокси
-USE_PROXY_BY_DEFAULT = False # Изменено на False для обхода таймаута
+USE_PROXY_BY_DEFAULT = True # Изменено на False для обхода таймаута
 PROXY_HTTP_URL = "http://mm4pkP:a6K4yx@95.181.155.167:8000"
 PROXY_HTTP_ALT = "http://lte6:LVxqnyQiMH@65.109.79.15:13014"
 # Поведение запросов (увеличено для снижения 429)
@@ -148,6 +148,14 @@ TOURNAMENT_MAP = {
     'iem': 'iem',
     'major': 'мейджор'
 }
+
+PROXIES = [
+    "http://M9aRJb:upBCUY@217.29.62.214:10744",   # IPv6: 2a06:c006:2834:9dc3:d37d:6463:4f1e:89da
+    "http://M9aRJb:upBCUY@217.29.62.214:10743",   # IPv6: 2a06:c006:ade3:cdb9:7f6c:b2dd:5e4e:27af
+    "http://M9aRJb:upBCUY@217.29.62.214:10742",   # IPv6: 2a06:c006:1044:3305:256c:5a7b:d7ca:6862
+    "http://M9aRJb:upBCUY@217.29.63.40:12724",    # IPv6: 2a06:c006:b785:bc2d:6c8e:2a97:eada:6983
+]
+
 # Заглушка
 MAINTENANCE_MESSAGE = "⚠️ Я временно недоступен, ведутся технические работы!\nНе теряйте меня! Подписывайтесь на наши новости: @valvestreet_media"
 # ===================== НАСТРОЙКА ЛОГИРОВАНИЯ =====================
@@ -160,6 +168,20 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+def rotate_proxy():
+    global current_proxy_index, consecutive_proxy_failures
+    if not PROXIES:
+        logger.warning("PROXIES list is empty — cannot rotate")
+        disable_proxy()
+        return
+    
+    current_proxy_index = (current_proxy_index + 1) % len(PROXIES)
+    proxy = PROXIES[current_proxy_index]
+    enable_proxy(proxy)
+    consecutive_proxy_failures = 0  # сбрасываем счётчик после ротации
+    logger.info(f"Rotated proxy to {current_proxy_index + 1}/{len(PROXIES)}: {proxy.split('@')[1] if '@' in proxy else proxy}")
+
 def log_event(stage: str, description: str, item_name: str = None):
     msg = f"Stage: {stage} | Description: {description}"
     if item_name:
@@ -382,70 +404,79 @@ def notify_monitor_bot(event_type: str, details: str = ""):
         logger.error(f"Error sending notification to monitor bot: {e}")
 # ===================== РЕКВЕСТЫ С RETRY / FALLBACK =====================
 def request_with_retries(url: str, params=None, headers=None, timeout=15, allow_429_backoff=True, force_direct=False):
-    global RATE_LIMIT_COUNT, USE_PROXY
+    global RATE_LIMIT_COUNT, USE_PROXY, consecutive_proxy_failures
     if force_direct:
         session.proxies.clear()
+    
     attempt = 0
     consecutive_429 = 0
     while attempt <= MAX_RETRIES:
         try:
             r = session.get(url, params=params, headers=headers, timeout=timeout)
+            
+            # Успешный ответ — сбрасываем счётчики
+            if r.status_code == 200:
+                consecutive_proxy_failures = 0
+                return r
+            
+            # 429 Too Many Requests
             if r.status_code == 429 and allow_429_backoff:
                 consecutive_429 += 1
                 RATE_LIMIT_COUNT += 1
+                consecutive_proxy_failures += 1
+                
+                # Ротация при 429
+                if consecutive_proxy_failures >= 2:  # 2 раза 429 — меняем прокси
+                    rotate_proxy()
+                
                 attempt_429 = 0
                 while attempt_429 < MAX_RETRIES_429:
                     attempt_429 += 1
-                    backoff = BACKOFF_BASE ** attempt_429 + random.random()
+                    backoff = BACKOFF_BASE ** attempt_429 + random.random() * 5
                     time.sleep(backoff)
                     r = session.get(url, params=params, headers=headers, timeout=timeout)
                     if r.status_code != 429:
                         consecutive_429 = 0
+                        consecutive_proxy_failures = 0
+                        if r.status_code == 200:
+                            return r
                         break
+                
                 if consecutive_429 >= 3:
                     time.sleep(RATE_LIMIT_PAUSE)
+                    rotate_proxy()  # принудительная ротация после паузы
                     consecutive_429 = 0
-                    if USE_PROXY:
-                        enable_proxy(PROXY_HTTP_ALT)
-                        USE_PROXY = True
-                    else:
-                        disable_proxy()
+            
+            # Cloudflare блок или капча
+            elif r.status_code in (403, 503) or "cloudflare" in r.text.lower() or "attention required" in r.text.lower():
+                logger.warning(f"Cloudflare block detected on {url} — rotating proxy")
+                consecutive_proxy_failures += 1
+                if consecutive_proxy_failures >= 2:
+                    rotate_proxy()
+                time.sleep(10 + random.random() * 10)
+                continue
+            
+            # Другие ошибки
+            else:
+                consecutive_proxy_failures += 1
+                if consecutive_proxy_failures >= 3:
+                    rotate_proxy()
+            
             return r
-        except (SSLError, ProxyError) as err:
-            consecutive_429 = 0
-            old_proxies = session.proxies.copy()
-            try:
-                if "mm4pkP" in PROXY_HTTP_URL and USE_PROXY:
-                    enable_proxy(PROXY_HTTP_ALT)
-                else:
-                    disable_proxy()
-                r = session.get(url, params=params, headers=headers, timeout=timeout)
-                if r.status_code == 429 and allow_429_backoff:
-                    attempt_429 = 0
-                    while attempt_429 < MAX_RETRIES_429:
-                        attempt_429 += 1
-                        backoff = BACKOFF_BASE ** attempt_429 + random.random()
-                        time.sleep(backoff)
-                        r = session.get(url, params=params, headers=headers, timeout=timeout)
-                        if r.status_code != 429:
-                            break
-                return r
-            except Exception:
-                pass
-            finally:
-                session.proxies = old_proxies
+            
+        except (SSLError, ProxyError, RequestException) as err:
+            logger.warning(f"Request error ({type(err).__name__}): {err} — rotating proxy")
+            consecutive_proxy_failures += 1
+            if consecutive_proxy_failures >= 2:
+                rotate_proxy()
+            
             attempt += 1
-            backoff = BACKOFF_BASE ** attempt + random.random()
+            backoff = BACKOFF_BASE ** attempt + random.random() * 5
             time.sleep(backoff)
             continue
-        except RequestException as e:
-            attempt += 1
-            backoff = BACKOFF_BASE ** attempt + random.random()
-            time.sleep(backoff)
-            continue
-    logger.warning(f"Request to {url} failed after {MAX_RETRIES} retries")
+    
+    logger.error(f"Request to {url} failed after {MAX_RETRIES} retries and proxy rotations")
     return None
-# ===================== ЗАГРУЗКА ПРЕДМЕТОВ =====================
 def load_items(force_update: bool = False) -> Dict[str, Any]:
     items = {} # Инициализируем пустым
     if os.path.exists(LOCAL_DB) and not force_update:
@@ -629,25 +660,29 @@ def get_item_data(market_hash_name: str) -> Dict[str, Any]:
         return {"history": [], "sell_listings": 0, "buy_orders": 0, "total_listings": 0, "price_usd": 0.0, "image_url": "", "histogram": None}
     soup = BeautifulSoup(r.text, "html.parser")
     # Парсинг истории цен (unchanged)
-    scripts = soup.find_all("script")
+    scripts = soup.find_all("script", type="text/javascript")
     candidate = None
     for script in scripts:
-        text = script.string
+        text = script.string or ""
         if not text:
             continue
-        m = re.search(r'var\s+line1\s*=\s*(\[\s*\[.*?\]\s*\])\s*;', text, re.DOTALL)
-        if not m:
-            m = re.search(r'var\s+g_rgHistory\s*=\s*(\[\s*\[.*?\]\s*\])\s*;', text, re.DOTALL)
-        if not m:
-            m2 = re.search(r'Market_LoadOrderHistogram\(\s*(\{.*?"sell_order_table".*?\})\s*\)', text, re.DOTALL)
-            if m2:
-                obj = safe_json_loads(m2.group(1))
-                if obj:
-                    pass
-            m = None
-        if m:
-            candidate = m.group(1)
+        # Старые варианты
+        patterns = [
+            r'var\s+line1\s*=\s*(\[.*?\]);',
+            r'var\s+g_rgHistory\s*=\s*(\[.*?\]);',
+            r'var\s+g_rgListingInfo\s*=\s*(\{.*?\});',  # иногда здесь
+            r'var\s+g_rgAssets\s*=\s*(\{.*?\});',       # новый вариант 2025-2026
+            r'data:\s*(\[.*?\]),\s*name:\s*"Price History"',  # если в chart
+        ]
+        for pattern in patterns:
+            m = re.search(pattern, text, re.DOTALL)
+            if m:
+                candidate = m.group(1)
+                break
+        if candidate:
             break
+
+    # Если нашёл — парсь как раньше
     if candidate:
         parsed = safe_json_loads(candidate)
         if parsed:
@@ -1573,21 +1608,12 @@ def main():
         log_event("summary_load", f"Last summary sent on: {last_summary_sent}")
     else:
         log_event("summary_load", "No previous summary found")
-    if USE_PROXY:
-        try:
-            r = session.get("https://api.ipify.org?format=json", timeout=10)
-            if r.status_code != 200:
-                raise Exception("Proxy test failed")
-            print(f"Proxy IP: {r.json()['ip']}")
-            r2 = session.get(BYMYKEL_URL, timeout=10)
-            if r2.status_code != 200:
-                raise Exception("Proxy can't reach API")
-        except Exception as e:
-            print(f"Proxy failed ({e}), disabling...")
-            USE_PROXY = False
-            disable_proxy()
+    if USE_PROXY_BY_DEFAULT and PROXIES:
+        rotate_proxy()  # берём первый прокси из списка
+        logger.info(f"Proxy rotation enabled: {len(PROXIES)} proxies loaded")
     else:
         disable_proxy()
+        logger.info("Proxy disabled")
     items_raw = load_items()
     valid_items = get_valid_items(items_raw)
     total_items = len(valid_items)
